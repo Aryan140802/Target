@@ -12,28 +12,24 @@ angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
-center_x = 258
-center_y = 268
+center_x = 252
+center_y = 257
 
 ring_10x = 8
 ring_10 = 18
-ring_9 = 44
-ring_8 = 72
-ring_7 = 97
-ring_6 = 122
-ring_5 = 151
-ring_4 = 179
-ring_3 = 211
-ring_2 = 240
-ring_1 = 263
+ring_9 = 38
+ring_8 = 61
+ring_7 = 81
+ring_6 = 107
+ring_5 = 135
+ring_4 = 165
+ring_3 = 188
+ring_2 = 222
+ring_1 = 253
 
 
 # Initialize the video feed
 video_feed = VideoFeed()
-
-
-
-
 
 def cleanCircles(concentricCircles):
     cleanedCircles = []
@@ -180,7 +176,6 @@ def calculateDistance(x1, y1, x2=251, y2=252):
 
 def displayScore(score, canvas):
     cv.putText(canvas, f'Score: {score}', (200, 40), cv.FONT_HERSHEY_PLAIN, 3, (80, 127, 255), 3)
-    print(score)
     return canvas
 
 
@@ -210,61 +205,87 @@ def updateScore(bullets):
         if 0 <= dist <= ring_10:
             score[10].append((x, y))
             score_sum += 10
-            print(f"Score for Hole 10: {score[10]} (Total: {score_sum})")  # Print current score for hole 10
             angles[10].append(angle)
         elif ring_10 < dist <= ring_9:
             score[9].append((x, y))
             score_sum += 9
-            print(f"Score for Hole 9: {score[9]} (Total: {score_sum})")  # Print current score for hole 9
             angles[9].append(angle)
         elif ring_9 < dist <= ring_8:
             score[8].append((x, y))
             score_sum += 8
-            print(f"Score for Hole 8: {score[8]} (Total: {score_sum})")
             angles[8].append(angle)
         elif ring_8 < dist <= ring_7:
             score[7].append((x, y))
             score_sum += 7
-            print(f"Score for Hole 7: {score[7]} (Total: {score_sum})")
             angles[7].append(angle)
         elif ring_7 < dist <= ring_6:
             score[6].append((x, y))
             score_sum += 6
-            print(f"Score for Hole 6: {score[6]} (Total: {score_sum})")
             angles[6].append(angle)
         elif ring_6 < dist <= ring_5:
             score[5].append((x, y))
             score_sum += 5
-            print(f"Score for Hole 5: {score[5]} (Total: {score_sum})")
             angles[5].append(angle)
         elif ring_5 < dist <= ring_4:
             score[4].append((x, y))
             score_sum += 4
-            print(f"Score for Hole 4: {score[4]} (Total: {score_sum})")
             angles[4].append(angle)
         elif ring_4 < dist <= ring_3:
             score[3].append((x, y))
             score_sum += 3
-            print(f"Score for Hole 3: {score[3]} (Total: {score_sum})")
             angles[3].append(angle)
         elif ring_3 < dist <= ring_2:
             score[2].append((x, y))
             score_sum += 2
-            print(f"Score for Hole 2: {score[2]} (Total: {score_sum})")
             angles[2].append(angle)
         elif ring_2 < dist <= ring_1:
             score[1].append((x, y))
             score_sum += 1
-            print(f"Score for Hole 1: {score[1]} (Total: {score_sum})")
             angles[1].append(angle)
 
 
+def correctFisheye(frame1):
+    height, width, _ = frame.shape
 
+    fish_eye = {
+        'focal': [433, 1500],
+        'cx': [376, 1500], 'cy': [408, 600],
+        'k1': [30, 100], 'k2': [100, 100]
+    }
+    wrap_points = {
+        'x1': 19, 'y1': 116,
+        'x2': 84, 'y2': 677,
+        'x3': 675, 'y3': 693,
+        'x4': 789, 'y4': 103
+    }
+    # global focal, cx, cy, k1, k2
+    focal = fish_eye['focal'][0] - 60
+    cx = fish_eye['cx'][0] - 60
+    cy = fish_eye['cy'][0] - 60
+    k1 = (fish_eye['k1'][0] - 60)/100
+    k2 = (fish_eye['k2'][0] - 60)/100
+    K = np.array([[focal, 0, cx],
+                  [0, focal, cy],
+                  [0, 0, 1]], dtype=np.float32)  # Ensure matrix is of type float32
 
+    D = np.array([k1, k2, 0, 0], dtype=np.float32)  # Ensure the distortion coefficients are also float32
+    new_K = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, (width, height), np.eye(3), balance=1)
+    undistorted_image = cv.fisheye.undistortImage(frame1, K, D=D, Knew=new_K)
+    points = np.array([
+        [wrap_points['x1'], wrap_points['y1']],
+        [wrap_points['x2'], wrap_points['y2']],
+        [wrap_points['x3'], wrap_points['y3']],
+        [wrap_points['x4'], wrap_points['y4']]
+    ], dtype=np.int32)
+    # cv.polylines(undistorted_image, [points], True, (0, 255, 0), 3)
+    # cv.imshow('Fisheye Correction', undistorted_image)
+    return undistorted_image
 
 ret, frame = video_feed.read()
 
-points_src = np.array([[9, 62], [9, 569], [619, 89], [548, 622]])
+frame = correctFisheye(frame)
+
+points_src = np.array([[0, 47],[71,551],[646,77],[557,578]])
 points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
 matrix, _ = cv.findHomography(points_src, points_dst)
@@ -284,7 +305,6 @@ print(angles)
 new_score = 0
 score_dict = {"bullets": [], "total_score": 0}
 
-
 try:
     # response = sendData(output_frame, score_dict)
     response = sendData(output_frame, angles)
@@ -296,6 +316,7 @@ output_frame = displayScore(score_sum, output_frame)
 
 cv.imshow('frame', output_frame)
 
-# cv.waitKey(0)
+cv.waitKey(0)
+
 video_feed.cleanup()
 cv.destroyAllWindows()
