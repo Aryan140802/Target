@@ -1,101 +1,104 @@
+from datetime import time
+
 import cv2 as cv
 import cv2.aruco as aruco
 import numpy as np
 import math
 import requests
 import json
-import time
 from starter_script import VideoFeed  # Import the VideoFeed class
 
 
-
-prev_frame = None
-fps_limit = 1
-start_time = time.time()
 score = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
-center_x = 258
-center_y = 268
+center_x = 252
+center_y = 257
 
 ring_10x = 8
 ring_10 = 18
-ring_9 = 44
-ring_8 = 72
-ring_7 = 97
-ring_6 = 122
-ring_5 = 151
-ring_4 = 179
-ring_3 = 211
-ring_2 = 240
-ring_1 = 263
+ring_9 = 38
+ring_8 = 61
+ring_7 = 81
+ring_6 = 107
+ring_5 = 135
+ring_4 = 165
+ring_3 = 188
+ring_2 = 222
+ring_1 = 253
+
 
 # Initialize the video feed
 video_feed = VideoFeed()
 
 
-def getBullets(th1,output_frame, draw = True):
+
+
+def getBullets(th1, output_frame, draw=True):
     contours = cv.findContours(th1, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)[0]
     bullets = []
     for contour in contours:
         # print(contour)
         approx = cv.approxPolyDP(contour, 0.02 * cv.arcLength(contour, True), True)
         ((x, y), radius) = cv.minEnclosingCircle(contour)
-        bullets.append((int(x),int(y)))
+        bullets.append((int(x), int(y)))
         cv.circle(output_frame, (int(x), int(y)), (int(radius)), (0, 0, 255), -1)
 
     return bullets
 
-def calculateDistance(x1,y1,x2=250,y2=250):
-    radius = math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1))
+
+def calculateDistance(x1, y1, x2=250, y2=250):
+    radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
     # print(x1,y1,x2,y2,radius)
     return radius
 
+
 def updateScore(bullets):
-    global score_sum,score,angles
+    global score_sum, score, angles
     for x, y in bullets:
         dist = calculateDistance(x, y)
-        angle = calculateAngle(x,y)
+        angle = calculateAngle(x, y)
+
         if 0 <= dist <= ring_10:
-            score[10].append((x,y))
+            score[10].append((x, y))
             score_sum += 10
             angles['10'].append(angle)
         elif ring_10 < dist <= ring_9:
-            score[9].append((x,y))
+            score[9].append((x, y))
             score_sum += 9
             angles['9'].append(angle)
         elif ring_9 < dist <= ring_8:
-            score[8].append((x,y))
+            score[8].append((x, y))
             score_sum += 8
             angles['8'].append(angle)
         elif ring_8 < dist <= ring_7:
-            score[7].append((x,y))
+            score[7].append((x, y))
             score_sum += 7
             angles['7'].append(angle)
         elif ring_7 < dist <= ring_6:
-            score[6].append((x,y))
+            score[6].append((x, y))
             score_sum += 6
             angles['6'].append(angle)
         elif ring_6 < dist <= ring_5:
-            score[5].append((x,y))
+            score[5].append((x, y))
             score_sum += 5
             angles['5'].append(angle)
         elif ring_5 < dist <= ring_4:
-            score[4].append((x,y))
+            score[4].append((x, y))
             score_sum += 4
             angles['4'].append(angle)
         elif ring_4 < dist <= ring_3:
-            score[3].append((x,y))
+            score[3].append((x, y))
             score_sum += 3
             angles['3'].append(angle)
         elif ring_3 < dist <= ring_2:
-            score[2].append((x,y))
+            score[2].append((x, y))
             score_sum += 2
             angles['2'].append(angle)
         elif ring_2 < dist <= ring_1:
-            score[1].append((x,y))
+            score[1].append((x, y))
             score_sum += 1
             angles['1'].append(angle)
 
@@ -103,8 +106,10 @@ def updateScore(bullets):
 def drawFrame(frame):
     i = 1
     for points in score.keys():
-        frame = cv.putText(frame,f"{points}:{len(score[points])}",(0,20 * i),cv.FONT_HERSHEY_COMPLEX,0.5,(0,0,255),2)
-        i+=1
+        frame = cv.putText(frame, f"{points}:{len(score[points])}", (0, 20 * i), cv.FONT_HERSHEY_COMPLEX, 0.5,
+                           (0, 0, 255), 2)
+        i += 1
+
 
 def sendData(image, angles):
     _, img_encoded = cv.imencode('.jpg', image)
@@ -115,11 +120,12 @@ def sendData(image, angles):
     # data = {'score': score}
 
     # response = requests.post(URL, files=files, json=score)
-    response = requests.post(URL,files=files)
+    response = requests.post(URL, files=files)
 
     return response
 
-def calculateAngle(x,y):
+
+def calculateAngle(x, y):
     delta_x = (x - center_x)
     delta_y = (y - center_y)
     if delta_x == 0:
@@ -127,7 +133,7 @@ def calculateAngle(x,y):
     else:
         # slope_hole = delta_y/delta_x
         # angle = round(math.atan(abs(slope_hole-slope_base/(1+ slope_hole*slope_base))) * 180 / math.pi)
-        angle = round(math.atan2(delta_y,delta_x) * 180 / math.pi)
+        angle = round(math.atan2(delta_y, delta_x) * 180 / math.pi)
         return angle
 
 
@@ -144,58 +150,92 @@ def get_current_score():
         print(f"Error: {e}")
         return None
 
+
 angles = get_current_score()
 print(type(angles))
 if angles is None:
-    angles = {10:[],9:[],8:[],7:[],6:[],5:[],4:[],3:[],2:[],1:[]}
+    angles = {'10': [], '9': [], '8': [], '7': [], '6': [], '5': [], '4': [], '3': [], '2': [], '1': []}
 for val in angles.keys():
     score_sum += int(val) * len(angles[val])
 
 
-print(angles)
+def correctFisheye(frame1):
+    height, width, _ = frame.shape
+
+    fish_eye = {
+        'focal': [300, 1500],
+        'cx': [width // 2 + 60, 1500], 'cy': [height // 2 + 60, 600],
+        'k1': [30, 100], 'k2': [75, 100]
+    }
+    wrap_points = {
+        'x1': 19, 'y1': 116,
+        'x2': 84, 'y2': 677,
+        'x3': 675, 'y3': 693,
+        'x4': 789, 'y4': 103
+    }
+    # global focal, cx, cy, k1, k2
+    focal = fish_eye['focal'][0] - 60
+    cx = fish_eye['cx'][0] - 60
+    cy = fish_eye['cy'][0] - 60
+    k1 = (fish_eye['k1'][0] - 60) / 100
+    k2 = (fish_eye['k2'][0] - 60) / 100
+    K = np.array([[focal, 0, cx],
+                  [0, focal, cy],
+                  [0, 0, 1]], dtype=np.float32)  # Ensure matrix is of type float32
+
+    D = np.array([k1, k2, 0, 0], dtype=np.float32)  # Ensure the distortion coefficients are also float32
+    new_K = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, (width, height), np.eye(3), balance=1)
+    undistorted_image = cv.fisheye.undistortImage(frame1, K, D=D, Knew=new_K)
+    points = np.array([
+        [wrap_points['x1'], wrap_points['y1']],
+        [wrap_points['x2'], wrap_points['y2']],
+        [wrap_points['x3'], wrap_points['y3']],
+        [wrap_points['x4'], wrap_points['y4']]
+    ], dtype=np.int32)
+    # cv.polylines(undistorted_image, [points], True, (0, 255, 0), 3)
+    # cv.imshow('Fisheye Correction', undistorted_image)
+    return undistorted_image
+
+
+# print(angles)
 while True:
     ret, frame = video_feed.read()
+
     curr_time = time.time()
 
     if not ret:
         print("Error with Webcam")
         break
 
+    frame = correctFisheye(frame)
 
-
-    if((curr_time - start_time)) > fps_limit:
-    # if True:
+    if ((curr_time - start_time)) > fps_limit:
+        # if True:
 
         # ret = True
         # frame = cv.imread("./targetWithHole.jpg")
-        #corrected_image, target_detected = correctPerspective(frame)
-        #frame = corrected_image.copy()
-        points_src = np.array([[9, 62], [9, 569], [619, 89], [548, 622]])
+        # corrected_image, target_detected = correctPerspective(frame)
+        # frame = corrected_image.copy()
+        points_src = np.array([[0, 47], [71, 551], [646, 77], [557, 578]])
         points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
-
-
 
         matrix, _ = cv.findHomography(points_src, points_dst)
         image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
-        frame = cv.GaussianBlur(frame,(5,5),0)
-
-        # hcont = cv.hconcat([output_frame,cv.cvtColor(mask1,cv.COLOR_GRAY2BGR),cv.cvtColor(mask2,cv.COLOR_GRAY2BGR)])
-
-        # cv.imshow('frame', hcont)
+        frame = cv.GaussianBlur(frame, (5, 5), 0)
 
         output_frame = frame.copy()
-        #if target_detected:
+        # if target_detected:
         if prev_frame is not None:
-            diff_frame = 255 - cv.absdiff(frame,prev_frame)
+            diff_frame = 255 - cv.absdiff(frame, prev_frame)
             # output_frame = diff_frame
-            grayscale_frame = cv.cvtColor(diff_frame,cv.COLOR_BGR2GRAY)
-            ret2,th1 = cv.threshold(grayscale_frame,170,255,cv.THRESH_BINARY)
+            grayscale_frame = cv.cvtColor(diff_frame, cv.COLOR_BGR2GRAY)
+            ret2, th1 = cv.threshold(grayscale_frame, 170, 255, cv.THRESH_BINARY)
             th1 = cv.bitwise_not(th1)
             kernel = np.ones((3, 3), np.uint8)
             th1 = cv.dilate(th1, kernel, iterations=3)
             # th1 = cv.erode(th1, kernel, iterations=5)
-                # output_frame = th1
+            # output_frame = th1
             bullets = getBullets(th1, output_frame)
             prev_score_sum = score_sum
             updateScore(bullets)
@@ -207,22 +247,20 @@ while True:
                     print(f"Server response: {response.status_code}, {response.text}")
 
                 except Exception as e:
-                    print("The error is: ",e)
+                    print("The error is: ", e)
 
-                # print("frame done")
+            output_frame = cv.hconcat(
+                [output_frame, cv.cvtColor(grayscale_frame, cv.COLOR_GRAY2BGR), cv.cvtColor(th1, cv.COLOR_GRAY2BGR)])
 
-            output_frame = cv.hconcat([output_frame,cv.cvtColor(grayscale_frame,cv.COLOR_GRAY2BGR),cv.cvtColor(th1,cv.COLOR_GRAY2BGR)])
+        prev_frame = frame
 
-            prev_frame = frame
-
-        cv.imshow('frame', output_frame)
+        # cv.imshow('frame', output_frame)
         start_time = time.time()
 
     key = cv.waitKey(1)
 
     if key == ord('q'):
         break
-
 
 video_feed.cleanup()
 cv.destroyAllWindows()
