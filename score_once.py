@@ -6,30 +6,66 @@ import requests
 import json
 from starter_script import VideoFeed  # Import the VideoFeed class
 
+calibration_data = np.load('calibration_params.npz')
+mtx = calibration_data['mtx']
+dist = calibration_data['dist']
+
+
+
+
+
 
 score = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
-center_x = 252
-center_y = 257
 
-ring_10x = 8
-ring_10 = 18
-ring_9 = 38
-ring_8 = 61
-ring_7 = 81
-ring_6 = 107
-ring_5 = 135
-ring_4 = 165
-ring_3 = 188
-ring_2 = 222
-ring_1 = 253
 
 
 # Initialize the video feed
 video_feed = VideoFeed()
+
+
+def getArucoCenters(corners):
+    centers = []
+    for marker in corners:
+        x_sum = 0
+        y_sum = 0
+        for x, y in marker[0]:
+            x_sum += x
+            y_sum += y
+
+        center = (int(x_sum // 4), int(y_sum // 4))
+        centers.append(center)
+    return centers
+
+
+def addToDict(centers, ids):
+    center_dict = {}
+    for i in range(len(centers)):
+        center_dict[ids[i][0]] = centers[i]
+
+    return center_dict
+
+
+def correctPerspective(frame):
+    gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
+    markers_found = False
+    if ids is not None and len(ids) == 4:
+        centers = getArucoCenters(corners)
+        center_dict = addToDict(centers, ids)
+        points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
+        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+
+        matrix, _ = cv.findHomography(points_src, points_dst)
+        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        frame = image_out
+        markers_found = True
+
+    return frame, markers_found
+
 
 def cleanCircles(concentricCircles):
     cleanedCircles = []
@@ -153,7 +189,7 @@ def detectBlackRingBullets(frame, canvas):
     return canvas, bullets
 
 
-def drawRings(canvas, center_x=250, center_y=250):
+def drawRings(canvas, center_x=251, center_y=287):
     cv.circle(canvas, (center_x, center_y), (12), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (36), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (60), (255, 0, 255), 2)
@@ -169,7 +205,7 @@ def drawRings(canvas, center_x=250, center_y=250):
     return canvas
 
 
-def calculateDistance(x1, y1, x2=251, y2=252):
+def calculateDistance(x1, y1, x2=251, y2=287):
     radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
     return radius
 
@@ -186,8 +222,8 @@ def sendData(image, angles):
 
 
 def calculateAngle(x, y):
-    delta_x = (x - center_x)
-    delta_y = (y - center_y)
+    delta_x = (x - 251)
+    delta_y = (y - 287)
     if delta_x == 0:
         return -90
     else:
@@ -202,121 +238,77 @@ def updateScore(bullets):
     for x, y in bullets:
         dist = calculateDistance(x, y)
         angle = calculateAngle(x, y)
-        if 0 <= dist <= ring_10:
+        if 0 <= dist <= 12:
             score[10].append((x, y))
             score_sum += 10
             angles[10].append(angle)
-        elif ring_10 < dist <= ring_9:
+        elif 12 < dist <= 36:
             score[9].append((x, y))
             score_sum += 9
             angles[9].append(angle)
-        elif ring_9 < dist <= ring_8:
+        elif 36 < dist <= 60:
             score[8].append((x, y))
             score_sum += 8
             angles[8].append(angle)
-        elif ring_8 < dist <= ring_7:
+        elif 60 < dist <= 84:
             score[7].append((x, y))
             score_sum += 7
             angles[7].append(angle)
-        elif ring_7 < dist <= ring_6:
+        elif 84 < dist <= 108:
             score[6].append((x, y))
             score_sum += 6
             angles[6].append(angle)
-        elif ring_6 < dist <= ring_5:
+        elif 108 < dist <= 132:
             score[5].append((x, y))
             score_sum += 5
             angles[5].append(angle)
-        elif ring_5 < dist <= ring_4:
+        elif 132 < dist <= 156:
             score[4].append((x, y))
             score_sum += 4
             angles[4].append(angle)
-        elif ring_4 < dist <= ring_3:
+        elif 156 < dist <= 180:
             score[3].append((x, y))
             score_sum += 3
             angles[3].append(angle)
-        elif ring_3 < dist <= ring_2:
+        elif 180 < dist <= 204:
             score[2].append((x, y))
             score_sum += 2
             angles[2].append(angle)
-        elif ring_2 < dist <= ring_1:
+        elif 204 < dist <= 228:
             score[1].append((x, y))
             score_sum += 1
             angles[1].append(angle)
 
 
-def correctFisheye(frame1):
-    height, width, _ = frame.shape
-
-    fish_eye = {
-        'focal': [433, 1500],
-        'cx': [376, 1500], 'cy': [408, 600],
-        'k1': [30, 100], 'k2': [100, 100]
-    }
-    wrap_points = {
-        'x1': 19, 'y1': 116,
-        'x2': 84, 'y2': 677,
-        'x3': 675, 'y3': 693,
-        'x4': 789, 'y4': 103
-    }
-    # global focal, cx, cy, k1, k2
-    focal = fish_eye['focal'][0] - 60
-    cx = fish_eye['cx'][0] - 60
-    cy = fish_eye['cy'][0] - 60
-    k1 = (fish_eye['k1'][0] - 60)/100
-    k2 = (fish_eye['k2'][0] - 60)/100
-    K = np.array([[focal, 0, cx],
-                  [0, focal, cy],
-                  [0, 0, 1]], dtype=np.float32)  # Ensure matrix is of type float32
-
-    D = np.array([k1, k2, 0, 0], dtype=np.float32)  # Ensure the distortion coefficients are also float32
-    new_K = cv.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, (width, height), np.eye(3), balance=1)
-    undistorted_image = cv.fisheye.undistortImage(frame1, K, D=D, Knew=new_K)
-    points = np.array([
-        [wrap_points['x1'], wrap_points['y1']],
-        [wrap_points['x2'], wrap_points['y2']],
-        [wrap_points['x3'], wrap_points['y3']],
-        [wrap_points['x4'], wrap_points['y4']]
-    ], dtype=np.int32)
-    # cv.polylines(undistorted_image, [points], True, (0, 255, 0), 3)
-    # cv.imshow('Fisheye Correction', undistorted_image)
-    return undistorted_image
-
 ret, frame = video_feed.read()
-
-frame = correctFisheye(frame)
-
-points_src = np.array([[0, 47],[71,551],[646,77],[557,578]])
-points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
-
-matrix, _ = cv.findHomography(points_src, points_dst)
-image_out = cv.warpPerspective(frame, matrix, (500, 500))
-corrected_image = image_out
-
-# corrected_image, target_detected = correctPerspective(frame)
+frame = cv.undistort (frame, mtx, dist, None)
+corrected_image, target_detected = correctPerspective(frame)
 output_frame = corrected_image.copy()
 
-# if target_detected:
-# output_frame = drawRings(output_frame)
-output_frame, white_ring_bullets = detectWhiteRingBullets(corrected_image, output_frame)
-output_frame, black_ring_bulllets = detectBlackRingBullets(corrected_image, output_frame)
-updateScore(white_ring_bullets)
-updateScore(black_ring_bulllets)
-print(angles)
-new_score = 0
-score_dict = {"bullets": [], "total_score": 0}
+if target_detected:
+    # output_frame = drawRings(output_frame)
+    output_frame, white_ring_bullets = detectWhiteRingBullets(corrected_image, output_frame)
+    output_frame, black_ring_bulllets = detectBlackRingBullets(corrected_image, output_frame)
+    updateScore(white_ring_bullets)
+    updateScore(black_ring_bulllets)
+    print(angles)
+    new_score = 0
+    score_dict = {"bullets": [], "total_score": 0}
 
-try:
-    # response = sendData(output_frame, score_dict)
-    response = sendData(output_frame, angles)
-    print(f"Server response: {response.status_code}, {response.text}")
-    pass
-except Exception as e:
-    print("The error is: ", e)
-output_frame = displayScore(score_sum, output_frame)
+    try:
+        # response = sendData(output_frame, score_dict)
+        response = sendData(output_frame, angles)
+        print(f"Server response: {response.status_code}, {response.text}")
+        pass
+    except Exception as e:
+        print("The error is: ", e)
 
-cv.imshow('frame', output_frame)
+    output_frame = displayScore(score_sum, output_frame)
 
-cv.waitKey(0)
+# cv.imshow('frame', output_frame)
+
+# cv.waitKey(0)
+
 
 video_feed.cleanup()
 cv.destroyAllWindows()

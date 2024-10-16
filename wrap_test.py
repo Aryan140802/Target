@@ -29,26 +29,42 @@ show_wrapPoints = False
 show_Params = False
 sharpening = False
 show_OG = True
+show_Fish = False
 
 Thresh = 127
 k_size = 3
 lim = 0
 
+focal = 0
+cx = 0
+cy = 0
+k1 = 0
+k2 = 0
+
 wrap_points = {
-    'x1': 0, 'y1': 136,
-    'x2': 93, 'y2': 766,
-    'x3': 634, 'y3': 748,
-    'x4': 770, 'y4': 143
-}
+        'x1': 18, 'y1': 113,
+        'x2': 83, 'y2': 607,
+        'x3': 563, 'y3': 613,
+        'x4': 616, 'y4': 110
+    }
 
 rings = {
-    'center_x': 247, 'center_y': 250,
-    'ring_11':0,
-    'ring_10': 0, 'ring_9': 0, 'ring_8': 46,
-    'ring_7': 74, 'ring_6': 99, 'ring_5': 127, 'ring_4': 153,
-    'ring_3': 170, 'ring_2': 204, 'ring_1': 227,
+    'center_x': 250, 'center_y': 250,
+    'ring_11':8,
+    'ring_10':18, 'ring_9':46, 'ring_8':74,
+    'ring_7':100, 'ring_6': 122, 'ring_5': 147, 'ring_4': 174,
+    'ring_3': 199, 'ring_2': 219, 'ring_1': 244
 }
 
+cap = cv2.VideoCapture("http://192.168.1.5:8000/video_feed")
+_, frame = cap.read()
+height, width, _ = frame.shape
+
+fish_eye = {
+        'focal': [1500, 1500],
+        'cx': [427, 1500], 'cy': [0, 600],
+        'k1': [94, 100], 'k2': [8, 100]
+    }
 
 params = {'alpha': 1.5, 'beta': -0.5, 'gamma': 0}
 
@@ -58,7 +74,8 @@ key_actions = {
     ord('V'): 'show_wrapPoints',
     ord('R'): 'show_Rings',
     ord('B'): 'show_Params',
-    ord('S'): 'sharpening'
+    ord('S'): 'sharpening',
+    ord('F'): 'show_Fish'
 }
 
 
@@ -92,7 +109,7 @@ def startWrapPoints():
 
 def startParams():
     cv2.namedWindow("Params")
-    cv2.resizeWindow("Params", (400, 500))
+    cv2.resizeWindow("Params", (400, 300))
     for key1, initial_val in params.items():
         cv2.createTrackbar(key1, 'Params', int(initial_val*2+20), 40,
                            lambda val, key=key1: update_point(((val / 2) - 10), key, params))
@@ -123,7 +140,7 @@ def imageProcessor(frame1, sharp: bool):
 
 def startRings():
     cv2.namedWindow("Ring_Points")
-    cv2.resizeWindow("Ring_Points", (400, 850))
+    cv2.resizeWindow("Ring_Points", (400, 750))
     for key1, initial_val in rings.items():
         cv2.createTrackbar(key1, 'Ring_Points', initial_val, 400, lambda val, key=key1: update_point(val, key, rings))
 
@@ -142,6 +159,21 @@ def update_point(val, key, cus_dict):
     cus_dict[key] = val
 
 
+def update_fish(val, key):
+    fish_eye[key][0] = val
+    print(key, ' : ', globals()[key])
+
+
+def startFishPoints():
+
+    cv2.namedWindow("FishPoints")
+    cv2.resizeWindow("FishPoints", (600, 200))
+
+    for point, initial_val in fish_eye.items():
+        cv2.createTrackbar(point, 'FishPoints', int(initial_val[0]), initial_val[1],
+                           lambda val, key=point: update_fish(val, key))
+
+
 def printAll():
     print(f"wrap Points: {wrap_points}")
     print(rings)
@@ -149,9 +181,33 @@ def printAll():
     print(f"Threshold: {Thresh}")
     print(f"Kernal Size: {k_size}")
 
+def correctFisheye(frame1):
+    global focal, cx, cy, k1, k2
+    focal = fish_eye['focal'][0] - 60
+    cx = fish_eye['cx'][0] - 60
+    cy = fish_eye['cy'][0] - 60
+    k1 = (fish_eye['k1'][0] - 60)/100
+    k2 = (fish_eye['k2'][0] - 60)/100
+    K = np.array([[focal, 0, cx],
+                  [0, focal, cy],
+                  [0, 0, 1]], dtype=np.float32)  # Ensure matrix is of type float32
+
+    D = np.array([k1, k2, 0, 0], dtype=np.float32)  # Ensure the distortion coefficients are also float32
+    new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(K, D, (width, height), np.eye(3), balance=1)
+    undistorted_image = cv2.fisheye.undistortImage(frame1, K, D=D, Knew=new_K)
+    points = np.array([
+        [wrap_points['x1'], wrap_points['y1']],
+        [wrap_points['x2'], wrap_points['y2']],
+        [wrap_points['x3'], wrap_points['y3']],
+        [wrap_points['x4'], wrap_points['y4']]
+    ], dtype=np.int32)
+    cv2.polylines(undistorted_image, [points], True, (0, 255, 0), 3)
+    cv2.imshow('Fisheye Correction', undistorted_image)
+    return undistorted_image
+
 
 if __name__ == "__main__":
-    cap = cv2.VideoCapture("http://192.168.1.4:8000/video_feed")
+    cap = cv2.VideoCapture("http://192.168.1.5:8000/video_feed")
     _, frame = cap.read()
     lim = max(frame.shape[0], frame.shape[1])
 
@@ -165,15 +221,22 @@ if __name__ == "__main__":
             [wrap_points['x3'], wrap_points['y3']],
             [wrap_points['x4'], wrap_points['y4']]
         ], dtype=np.int32)
-        cv2.polylines(frame, [points], True, (0, 255, 0), 3)
+
+        manage_window("Original Image", show_OG, None, closeWindow, lambda: cv2.imshow("Original Image", frame))
+        if show_Fish:
+            frame = correctFisheye(frame)
+            if (cv2.getWindowProperty("FishPoints", cv2.WND_PROP_VISIBLE)) < 1:
+                startFishPoints()
+        else:
+            closeWindow("FishPoints")
+            closeWindow("Fisheye Correction")
+            cv2.polylines(frame, [points], True, (0, 255, 0), 3)
 
         input_pts = np.float32(points)
         M = cv2.getPerspectiveTransform(input_pts, output_pts)
         frameW = cv2.warpPerspective(frame, M, (500, 500))
 
         k = cv2.waitKey(1)
-
-        # cv2.circle(frameW, (250,250), 50,(0, 0, 0), 2)
 
         if k == ord('P'):
             print(points)
@@ -186,7 +249,6 @@ if __name__ == "__main__":
 
         manage_window("WrapPoints", show_wrapPoints, startWrapPoints, closeWindow)
         manage_window("Wrapped Image", show_Wrapped, None, closeWindow, lambda: cv2.imshow("Wrapped Image", frameW))
-        manage_window("Original Image", show_OG, None, closeWindow, lambda: cv2.imshow("Original Image", frame))
         manage_window("Ring_Points", show_Rings, startRings, closeWindow, lambda: drawRings(frameW))
         manage_window("Params", show_Params, startParams, closeWindow, lambda: imageProcessor(frameW, sharpening))
 

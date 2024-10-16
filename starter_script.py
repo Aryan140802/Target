@@ -3,6 +3,11 @@ import numpy as np
 import requests
 
 
+calibration_data = np.load('calibration_params.npz')
+mtx = calibration_data['mtx']
+dist = calibration_data['dist']
+
+
 class VideoFeed:
     def __init__(self, flask_ip="127.0.0.1", flask_port=5000, video_port=8000):
         self.flask_ip = flask_ip
@@ -50,6 +55,7 @@ class VideoFeed:
 
     def process_frame(self):
         ret, frame = self.cap.read()
+        frame = cv.undistort(frame, mtx, dist, None)
 
         if ret:
             points_src = np.array([[9, 83], [9, 590], [563, 77], [578, 587]])
