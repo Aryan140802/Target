@@ -4,11 +4,16 @@ import numpy as np
 import math
 import requests
 import json
+
+from scoring_script import aruco_dict, parameters
 from starter_script import VideoFeed  # Import the VideoFeed class
+
 
 calibration_data = np.load('calibration_params.npz')
 mtx = calibration_data['mtx']
 dist = calibration_data['dist']
+
+
 
 
 
@@ -57,10 +62,10 @@ def correctPerspective(frame):
         centers = getArucoCenters(corners)
         center_dict = addToDict(centers, ids)
         points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
         markers_found = True
 
@@ -282,6 +287,7 @@ def updateScore(bullets):
 
 ret, frame = video_feed.read()
 frame = cv.undistort (frame, mtx, dist, None)
+
 corrected_image, target_detected = correctPerspective(frame)
 output_frame = corrected_image.copy()
 
