@@ -2,12 +2,6 @@ import cv2 as cv
 import numpy as np
 import requests
 
-
-calibration_data = np.load('calibration_params.npz')
-mtx = calibration_data['mtx']
-dist = calibration_data['dist']
-
-
 class VideoFeed:
     def __init__(self, flask_ip="127.0.0.1", flask_port=5000, video_port=8000):
         self.flask_ip = flask_ip
@@ -21,15 +15,23 @@ class VideoFeed:
         # Initialize video capture with the selected IP
         self.cap = cv.VideoCapture(f"http://{self.selected_ip}:{self.video_port}/video_feed")
 
+        # Check if the video capture was successful
+        if not self.cap.isOpened():
+            print(f"Failed to open video stream from: http://{self.selected_ip}:{self.video_port}/video_feed")
+            raise ValueError("Video capture initialization failed.")
+        else:
+            print("Video capture initialized successfully.")
+
         # URL to send frames for processing
         self.api_url = f'http://{self.flask_ip}:{self.flask_port}/api/starter'
 
     def get_selected_ip(self):
         try:
-            response = requests.get(f'http://{self.flask_ip}:{self.flask_port}/api/selected_ip')  # Correct Flask endpoint
+            response = requests.get(f'http://{self.flask_ip}:{self.flask_port}/api/selected_ip')
             if response.status_code == 200:
                 ip = response.json().get('selected_ip')
                 if ip:
+                    print(f"Selected IP: {ip}")  # Logging the IP
                     return ip
                 else:
                     print("No IP address selected.")
@@ -55,18 +57,10 @@ class VideoFeed:
 
     def process_frame(self):
         ret, frame = self.cap.read()
-        frame = cv.undistort(frame, mtx, dist, None)
-
         if ret:
-            points_src = np.array([[9, 83], [9, 590], [563, 77], [578, 587]])
-            points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
-
-            matrix, _ = cv.findHomography(points_src, points_dst)
-            frame_out = cv.warpPerspective(frame, matrix, (500, 580))
-
-            return frame_out
+            return frame
         else:
-            print("Failed to capture frame")
+            print("Failed to capture frame.")
             return None
 
     def stream_and_send(self):
@@ -83,15 +77,14 @@ class VideoFeed:
 
         self.cleanup()
 
-    def cleanup(self):
-        self.cap.release()
-        cv.destroyAllWindows()
-        print("Video feed stopped.")
-
     def read(self):
         ret, frame = self.cap.read()
         return ret, frame
 
+    def cleanup(self):
+        self.cap.release()
+        cv.destroyAllWindows()
+        print("Video feed stopped.")
 
 
 # This can be imported and used in another script

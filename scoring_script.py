@@ -12,6 +12,7 @@ calibration_data = np.load('calibration_params.npz')
 mtx = calibration_data['mtx']
 dist = calibration_data['dist']
 
+
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
 prev_frame = None
@@ -28,6 +29,8 @@ URL = 'http://127.0.0.1:5000/api/score'
 
 # Initialize the video feed
 video_feed = VideoFeed()
+
+
 
 
 def getArucoCenters(corners):
@@ -60,10 +63,10 @@ def correctPerspective(frame):
         centers = getArucoCenters(corners)
         center_dict = addToDict(centers, ids)
         points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
         markers_found = True
 
@@ -196,6 +199,7 @@ for val in angles.keys():
 while True:
     ret, frame = video_feed.read()
     frame = cv.undistort(frame, mtx, dist, None)
+
     curr_time = time.time()
 
     if not ret:

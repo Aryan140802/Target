@@ -1,14 +1,17 @@
 import cv2 as cv
 import numpy as np
-import requests
-import json
-import time
+import cv2.aruco as aruco
 
-# Initialize VideoCapture and GUI window
-cap = cv.VideoCapture("http://192.168.1.10:8000/video_feed")
+cap = cv.VideoCapture('http://192.168.1.10:8000/video_feed')
 cv.namedWindow("Frame")
 
-# Initialize parameters for center and ring sizes
+calibration_data = np.load('calibration_params.npz')
+mtx = calibration_data['mtx']
+dist = calibration_data['dist']
+
+aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+parameters = aruco.DetectorParameters()
+
 center_x = 251
 center_y = 287
 ring_10 = 12
@@ -22,26 +25,66 @@ ring_3 = 180
 ring_2 = 204
 ring_1 = 228
 
-# Function to draw rings on the canvas
+
+def getArucoCenters(corners):
+    centers = []
+    for marker in corners:
+        x_sum = 0
+        y_sum = 0
+        for x, y in marker[0]:
+            x_sum += x
+            y_sum += y
+        center = (int(x_sum // 4), int(y_sum // 4))
+        centers.append(center)
+    return centers
+
+
+def addToDict(centers, ids):
+    center_dict = {}
+    for i in range(len(centers)):
+        center_dict[ids[i][0]] = centers[i]
+    return center_dict
+
+
+def correctPerspective(frame):
+    gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
+    markers_found = False
+    if ids is not None and len(ids) == 4:
+        centers = getArucoCenters(corners)
+        center_dict = addToDict(centers, ids)
+        points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
+        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+
+        matrix, _ = cv.findHomography(points_src, points_dst)
+        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        frame = image_out
+        markers_found = True
+
+    return frame, markers_found
+
+
 def drawRings(canvas):
-    cv.circle(canvas, (center_x, center_y), 1, (0, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_10, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_9, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_8, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_7, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_6, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_5, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_4, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_3, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_2, (255, 0, 255), 2)
-    cv.circle(canvas, (center_x, center_y), ring_1, (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (1), (0, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_10), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_9), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_8), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_7), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_6), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_5), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_4), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_3), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_2), (255, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_1), (255, 0, 255), 2)
+
     return canvas
 
-# Empty function for trackbar event
+
 def nothing(_):
     pass
 
-# Create trackbars for dynamic adjustments
+
+# Trackbars for adjusting the center and rings dynamically
 cv.createTrackbar('Center X', 'Frame', 251, 400, nothing)
 cv.createTrackbar('Center Y', 'Frame', 287, 400, nothing)
 cv.createTrackbar('Ring 10', 'Frame', 12, 400, nothing)
@@ -62,38 +105,40 @@ while True:
         print("Error with camera")
         break
 
-    # Perform perspective correction on the frame (if needed)
-    points_src = np.array([[0, 49], [78, 578],[637, 49], [558, 578] ])
-    points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
-    matrix, _ = cv.findHomography(points_src, points_dst)
-    image_out = cv.warpPerspective(frame, matrix, (500, 580))
-    frame = image_out
+    # Undistort the captured frame
+    frame = cv.undistort(frame, mtx, dist, None)
 
-    # Read trackbar values for center and ring sizes
-    center_x = cv.getTrackbarPos('Center X', 'Frame')
-    center_y = cv.getTrackbarPos('Center Y', 'Frame')
-    ring_10 = cv.getTrackbarPos('Ring 10', 'Frame')
-    ring_9 = cv.getTrackbarPos('Ring 9', 'Frame')
-    ring_8 = cv.getTrackbarPos('Ring 8', 'Frame')
-    ring_7 = cv.getTrackbarPos('Ring 7', 'Frame')
-    ring_6 = cv.getTrackbarPos('Ring 6', 'Frame')
-    ring_5 = cv.getTrackbarPos('Ring 5', 'Frame')
-    ring_4 = cv.getTrackbarPos('Ring 4', 'Frame')
-    ring_3 = cv.getTrackbarPos('Ring 3', 'Frame')
-    ring_2 = cv.getTrackbarPos('Ring 2', 'Frame')
-    ring_1 = cv.getTrackbarPos('Ring 1', 'Frame')
+    # Process frame to detect markers and correct perspective
+    processed_frame, target_detected = correctPerspective(frame)
 
-    # Draw rings on the frame
-    frame = drawRings(frame)
+    if target_detected:
+        # Get the trackbar positions to dynamically adjust the rings
+        center_x = cv.getTrackbarPos('Center X', 'Frame')
+        center_y = cv.getTrackbarPos('Center Y', 'Frame')
+        ring_10 = cv.getTrackbarPos('Ring 10', 'Frame')
+        ring_9 = cv.getTrackbarPos('Ring 9', 'Frame')
+        ring_8 = cv.getTrackbarPos('Ring 8', 'Frame')
+        ring_7 = cv.getTrackbarPos('Ring 7', 'Frame')
+        ring_6 = cv.getTrackbarPos('Ring 6', 'Frame')
+        ring_5 = cv.getTrackbarPos('Ring 5', 'Frame')
+        ring_4 = cv.getTrackbarPos('Ring 4', 'Frame')
+        ring_3 = cv.getTrackbarPos('Ring 3', 'Frame')
+        ring_2 = cv.getTrackbarPos('Ring 2', 'Frame')
+        ring_1 = cv.getTrackbarPos('Ring 1', 'Frame')
 
-    # Display the frame with rings
-    cv.imshow("Frame", frame)
+        # Draw the rings on the processed frame
+        processed_frame = drawRings(processed_frame)
 
-    # Exit condition (press 'q' to quit)
+    # Combine original and processed frame side by side
+    combined_frame = np.hstack((frame, processed_frame))
+
+    # Display the combined frame
+    cv.imshow("Frame", combined_frame)
+
     key = cv.waitKey(1)
+
     if key == ord('q'):
         break
 
-# Release resources and close windows
 cap.release()
 cv.destroyAllWindows()
