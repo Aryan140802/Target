@@ -11,6 +11,7 @@ import time
 # mtx = calibration_data['mtx']
 # dist = calibration_data['dist']
 
+
 # cap = cv.VideoCapture(1)
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
@@ -21,7 +22,6 @@ score = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
-
 
 # Initialize the video feed
 
@@ -45,30 +45,22 @@ if selected_ip is None:
 # Use the selected IP in the video stream
 cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
 
-def getArucoCenters(corners):
-    print("getArucoCenters: Processing Aruco corners")
-    centers = []
+
+def getCorners(corners):
+    point_dict = {}
     for marker in corners:
-        x_sum = 0
-        y_sum = 0
-        for x, y in marker[0]:
-            x_sum += x
-            y_sum += y
+        id = marker[0][0]
+        if id == 0:
+            point_dict[id] = marker[1][0][0]
+        elif id == 1:
+            point_dict[id] = marker[1][0][1]
+        elif id == 2:
+            point_dict[id] = marker[1][0][2]
+        elif id == 3:
+            point_dict[id] = marker[1][0][3]
 
-        center = (int(x_sum // 4), int(y_sum // 4))
-        centers.append(center)
-    print(f"getArucoCenters: Centers calculated: {centers}")
-    return centers
 
-
-def addToDict(centers, ids):
-    print(f"addToDict: Adding centers to dict with IDs: {ids}")
-    center_dict = {}
-    for i in range(len(centers)):
-        center_dict[ids[i][0]] = centers[i]
-
-    print(f"addToDict: Center dict: {center_dict}")
-    return center_dict
+    return point_dict
 
 
 def correctPerspective(frame):
@@ -78,9 +70,9 @@ def correctPerspective(frame):
     markers_found = False
     if ids is not None and len(ids) == 4:
         print(f"correctPerspective: Aruco markers detected with IDs: {ids}")
-        centers = getArucoCenters(corners)
-        center_dict = addToDict(centers, ids)
-        points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
+        combined = tuple(zip(ids,corners))
+        point_dict = getCorners(combined)
+        points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
         points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
@@ -108,7 +100,7 @@ def getBullets(th1, output_frame, draw=True):
     return bullets
 
 
-def calculateDistance(x1, y1, x2=251, y2=287):
+def calculateDistance(x1, y1, x2=254, y2=283):
     radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
     print(f"calculateDistance: Distance calculated between ({x1}, {y1}) and ({x2}, {y2}) is {radius}")
     return radius
@@ -121,46 +113,46 @@ def updateScore(bullets):
     for x, y in bullets:
         dist = calculateDistance(x, y)
         angle = calculateAngle(x, y)
-        if 0 <= dist <= 12:
+        if 0 <= dist <= 22:
             score[10].append((x, y))
             score_sum += 10
-            angles['10'].append(angle)
-        elif 12 < dist <= 36:
+            angles[10].append(angle)
+        elif 12 < dist <= 55:
             score[9].append((x, y))
             score_sum += 9
-            angles['9'].append(angle)
-        elif 36 < dist <= 60:
+            angles[9].append(angle)
+        elif 36 < dist <= 92:
             score[8].append((x, y))
             score_sum += 8
-            angles['8'].append(angle)
-        elif 60 < dist <= 84:
+            angles[8].append(angle)
+        elif 60 < dist <= 110:
             score[7].append((x, y))
             score_sum += 7
-            angles['7'].append(angle)
-        elif 84 < dist <= 108:
+            angles[7].append(angle)
+        elif 84 < dist <= 155:
             score[6].append((x, y))
             score_sum += 6
-            angles['6'].append(angle)
-        elif 108 < dist <= 132:
+            angles[6].append(angle)
+        elif 108 < dist <= 185:
             score[5].append((x, y))
             score_sum += 5
-            angles['5'].append(angle)
-        elif 132 < dist <= 156:
+            angles[5].append(angle)
+        elif 132 < dist <= 222:
             score[4].append((x, y))
             score_sum += 4
-            angles['4'].append(angle)
-        elif 156 < dist <= 180:
+            angles[4].append(angle)
+        elif 156 < dist <= 241:
             score[3].append((x, y))
             score_sum += 3
-            angles['3'].append(angle)
-        elif 180 < dist <= 204:
+            angles[3].append(angle)
+        elif 180 < dist <= 280:
             score[2].append((x, y))
             score_sum += 2
-            angles['2'].append(angle)
-        elif 204 < dist <= 228:
+            angles[2].append(angle)
+        elif 204 < dist <= 300:
             score[1].append((x, y))
             score_sum += 1
-            angles['1'].append(angle)
+            angles[1].append(angle)
 
     print(f"updateScore: Updated score: {score}, score_sum: {score_sum}")
 
@@ -190,8 +182,8 @@ def sendData(image, angles):
 
 
 def calculateAngle(x, y):
-    delta_x = (x - 251)
-    delta_y = (y - 287)
+    delta_x = (x - 254)
+    delta_y = (y - 283)
     if delta_x == 0:
         angle = -90
     else:

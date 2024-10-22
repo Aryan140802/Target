@@ -2,9 +2,10 @@ import cv2 as cv
 import numpy as np
 import cv2.aruco as aruco
 
-cap = cv.VideoCapture('http://192.168.1.10:8000/video_feed')
+cap = cv.VideoCapture('http://192.168.1.16:8000/video_feed')
 cv.namedWindow("Frame")
 
+# Uncomment these if you want to load camera calibration data
 # calibration_data = np.load('calibration_params.npz')
 # mtx = calibration_data['mtx']
 # dist = calibration_data['dist']
@@ -26,44 +27,41 @@ ring_3 = 180
 ring_2 = 204
 ring_1 = 228
 
+# List to store points
+corner_points = []
 
-def getArucoCenters(corners):
-    centers = []
+def getCorners(corners):
+    point_dict = {}
     for marker in corners:
-        x_sum = 0
-        y_sum = 0
-        for x, y in marker[0]:
-            x_sum += x
-            y_sum += y
-        center = (int(x_sum // 4), int(y_sum // 4))
-        centers.append(center)
-    return centers
-
-
-def addToDict(centers, ids):
-    center_dict = {}
-    for i in range(len(centers)):
-        center_dict[ids[i][0]] = centers[i]
-    return center_dict
-
+        id = marker[0][0]
+        if id == 0:
+            point_dict[id] = marker[1][0][0]
+        elif id == 1:
+            point_dict[id] = marker[1][0][1]
+        elif id == 2:
+            point_dict[id] = marker[1][0][2]
+        elif id == 3:
+            point_dict[id] = marker[1][0][3]
+    return point_dict
 
 def correctPerspective(frame):
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
     markers_found = False
     if ids is not None and len(ids) == 4:
-        centers = getArucoCenters(corners)
-        center_dict = addToDict(centers, ids)
-        points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
+        combined = tuple(zip(ids, corners))
+        point_dict = getCorners(combined)
+        points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
+        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 500))
+        image_out = cv.warpPerspective(frame, matrix, (500, 580))
         frame = image_out
         markers_found = True
 
+        # Append the points to corner_points list
+        corner_points.append(points_src)
     return frame, markers_found
-
 
 def drawRings(canvas):
     cv.circle(canvas, (center_x, center_y), (1), (0, 0, 255), 2)
@@ -77,13 +75,10 @@ def drawRings(canvas):
     cv.circle(canvas, (center_x, center_y), (ring_3), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (ring_2), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (ring_1), (255, 0, 255), 2)
-
     return canvas
-
 
 def nothing(_):
     pass
-
 
 # Trackbars for adjusting the center and rings dynamically
 cv.createTrackbar('Center X', 'Frame', 251, 400, nothing)
@@ -101,12 +96,11 @@ cv.createTrackbar('Ring 1', 'Frame', 228, 300, nothing)
 
 while True:
     ret, frame = cap.read()
-
     if not ret:
         print("Error with camera")
         break
 
-     # Undistort the captured frame
+    # Undistort the captured frame if needed
     # frame = cv.undistort(frame, mtx, dist, None)
 
     # Process frame to detect markers and correct perspective
@@ -130,15 +124,15 @@ while True:
         # Draw the rings on the processed frame
         processed_frame = drawRings(processed_frame)
 
-    # Combine original and processed frame side by side
-    # combined_frame = np.hstack((frame, processed_frame))
-
-    # Display the combined frame
+    # Display the processed frame
     cv.imshow("Frame", processed_frame)
 
     key = cv.waitKey(1)
-
     if key == ord('q'):
+        # Print the stored points when 'q' is pressed
+        print("Corner Points Collected:")
+        for points in corner_points:
+            print(points)
         break
 
 cap.release()

@@ -37,26 +37,21 @@ if selected_ip is None:
 cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
 
 
-def getArucoCenters(corners):
-    centers = []
+def getCorners(corners):
+    point_dict = {}
     for marker in corners:
-        x_sum = 0
-        y_sum = 0
-        for x, y in marker[0]:
-            x_sum += x
-            y_sum += y
+        id = marker[0][0]
+        if id == 0:
+            point_dict[id] = marker[1][0][0]
+        elif id == 1:
+            point_dict[id] = marker[1][0][1]
+        elif id == 2:
+            point_dict[id] = marker[1][0][2]
+        elif id == 3:
+            point_dict[id] = marker[1][0][3]
 
-        center = (int(x_sum // 4), int(y_sum // 4))
-        centers.append(center)
-    return centers
 
-
-def addToDict(centers, ids):
-    center_dict = {}
-    for i in range(len(centers)):
-        center_dict[ids[i][0]] = centers[i]
-
-    return center_dict
+    return point_dict
 
 
 def correctPerspective(frame):
@@ -64,9 +59,9 @@ def correctPerspective(frame):
     corners, ids, rejected = aruco.detectMarkers(image=gray_frame, dictionary=aruco_dict, parameters=parameters)
     markers_found = False
     if ids is not None and len(ids) == 4:
-        centers = getArucoCenters(corners)
-        center_dict = addToDict(centers, ids)
-        points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
+        combined = tuple(zip(ids,corners))
+        point_dict = getCorners(combined)
+        points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
         points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
