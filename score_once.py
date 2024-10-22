@@ -5,31 +5,41 @@ import math
 import requests
 import json
 
-from scoring_script import aruco_dict, parameters
-from starter_script import VideoFeed  # Import the VideoFeed class
+
+# calibration_data = np.load('calibration_params.npz')
+# mtx = calibration_data['mtx']
+# dist = calibration_data['dist']
 
 
-calibration_data = np.load('calibration_params.npz')
-mtx = calibration_data['mtx']
-dist = calibration_data['dist']
-
-
-
-
-
-
-
-
+aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+parameters = aruco.DetectorParameters()
 score = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
 
-
-
 # Initialize the video feed
-video_feed = VideoFeed()
+
+def selected_ip():
+    try:
+        response = requests.get('http://127.0.0.1:5000/api/selected_ip')  # Flask endpoint
+        if response.status_code == 200:
+            return response.json().get('selected_ip')
+        else:
+            print("Error fetching selected IP")
+            return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+selected_ip =  selected_ip()  # Fetch selected IP from the Flask app
+
+if selected_ip is None:
+    raise ValueError("No selected IP provided. Please ensure you have selected the device in the app.")
+
+# Use the selected IP in the video stream
+cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
 
 
 def getArucoCenters(corners):
@@ -285,9 +295,9 @@ def updateScore(bullets):
             angles[1].append(angle)
 
 
-ret, frame = video_feed.read()
-frame = cv.undistort (frame, mtx, dist, None)
+ret, frame = cap.read()
 
+# frame = cv.undistort (frame, mtx, dist, None)
 corrected_image, target_detected = correctPerspective(frame)
 output_frame = corrected_image.copy()
 
@@ -312,9 +322,8 @@ if target_detected:
     output_frame = displayScore(score_sum, output_frame)
 
 # cv.imshow('frame', output_frame)
-
+#
 # cv.waitKey(0)
 
-
-video_feed.cleanup()
+cap.release()
 cv.destroyAllWindows()
