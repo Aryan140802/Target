@@ -7,7 +7,7 @@ import requests
 import threading
 import webview  # PyWebview for desktop window
 import logging
-from starter_script import VideoFeed
+
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'your_secret_key'  # Necessary for session management
@@ -135,19 +135,19 @@ def get_selected_ip():
         return "An error occurred while retrieving the selected IP address.", 500
 
 
-# Additional API routes with logging
+
+
+
+
 @app.route('/api/starter', methods=['POST'])
 def receive_starter():
-    try:
-        global latest_image
+    global latest_image
 
-        image_file = request.files['image']
-        latest_image = image_file.read()
+    image_file = request.files['image']
 
-        return 'Data received successfully', 200
-    except Exception as e:
-        logger.error(f"Error in /api/starter: {e}")
-        return "An error occurred while receiving starter data.", 500
+    latest_image = image_file.read()
+
+    return 'Data received successfully', 200
 
 
 @app.route('/api/data')

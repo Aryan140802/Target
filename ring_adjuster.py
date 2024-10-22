@@ -5,15 +5,16 @@ import cv2.aruco as aruco
 cap = cv.VideoCapture('http://192.168.1.10:8000/video_feed')
 cv.namedWindow("Frame")
 
-calibration_data = np.load('calibration_params.npz')
-mtx = calibration_data['mtx']
-dist = calibration_data['dist']
+# calibration_data = np.load('calibration_params.npz')
+# mtx = calibration_data['mtx']
+# dist = calibration_data['dist']
 
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
 
 center_x = 251
 center_y = 287
+
 ring_10 = 12
 ring_9 = 36
 ring_8 = 60
@@ -54,10 +55,10 @@ def correctPerspective(frame):
         centers = getArucoCenters(corners)
         center_dict = addToDict(centers, ids)
         points_src = np.array([center_dict[0], center_dict[3], center_dict[1], center_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
         markers_found = True
 
@@ -105,8 +106,8 @@ while True:
         print("Error with camera")
         break
 
-    # Undistort the captured frame
-    frame = cv.undistort(frame, mtx, dist, None)
+     # Undistort the captured frame
+    # frame = cv.undistort(frame, mtx, dist, None)
 
     # Process frame to detect markers and correct perspective
     processed_frame, target_detected = correctPerspective(frame)
@@ -130,10 +131,10 @@ while True:
         processed_frame = drawRings(processed_frame)
 
     # Combine original and processed frame side by side
-    combined_frame = np.hstack((frame, processed_frame))
+    # combined_frame = np.hstack((frame, processed_frame))
 
     # Display the combined frame
-    cv.imshow("Frame", combined_frame)
+    cv.imshow("Frame", processed_frame)
 
     key = cv.waitKey(1)
 
