@@ -62,10 +62,10 @@ def correctPerspective(frame):
         combined = tuple(zip(ids,corners))
         point_dict = getCorners(combined)
         points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
         markers_found = True
 

@@ -100,7 +100,7 @@ def getBullets(th1, output_frame, draw=True):
     return bullets
 
 
-def calculateDistance(x1, y1, x2=254, y2=283):
+def calculateDistance(x1, y1, x2=255, y2=244):
     radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
     print(f"calculateDistance: Distance calculated between ({x1}, {y1}) and ({x2}, {y2}) is {radius}")
     return radius
@@ -113,43 +113,43 @@ def updateScore(bullets):
     for x, y in bullets:
         dist = calculateDistance(x, y)
         angle = calculateAngle(x, y)
-        if 0 <= dist <= 22:
+        if 10 <= dist <= 23:
             score[10].append((x, y))
             score_sum += 10
             angles[10].append(angle)
-        elif 12 < dist <= 55:
+        elif 23 < dist <= 53:
             score[9].append((x, y))
             score_sum += 9
             angles[9].append(angle)
-        elif 36 < dist <= 92:
+        elif 53 < dist <= 79:
             score[8].append((x, y))
             score_sum += 8
             angles[8].append(angle)
-        elif 60 < dist <= 110:
+        elif 79 < dist <= 105:
             score[7].append((x, y))
             score_sum += 7
             angles[7].append(angle)
-        elif 84 < dist <= 155:
+        elif 105 < dist <= 135:
             score[6].append((x, y))
             score_sum += 6
             angles[6].append(angle)
-        elif 108 < dist <= 185:
+        elif 135 < dist <= 162:
             score[5].append((x, y))
             score_sum += 5
             angles[5].append(angle)
-        elif 132 < dist <= 222:
+        elif 162 < dist <= 188:
             score[4].append((x, y))
             score_sum += 4
             angles[4].append(angle)
-        elif 156 < dist <= 241:
+        elif 188 < dist <= 215:
             score[3].append((x, y))
             score_sum += 3
             angles[3].append(angle)
-        elif 180 < dist <= 280:
+        elif 215 < dist <= 242:
             score[2].append((x, y))
             score_sum += 2
             angles[2].append(angle)
-        elif 204 < dist <= 300:
+        elif 242 < dist <= 268:
             score[1].append((x, y))
             score_sum += 1
             angles[1].append(angle)
@@ -182,8 +182,8 @@ def sendData(image, angles):
 
 
 def calculateAngle(x, y):
-    delta_x = (x - 254)
-    delta_y = (y - 283)
+    delta_x = (x - 255)
+    delta_y = (y - 244)
     if delta_x == 0:
         angle = -90
     else:

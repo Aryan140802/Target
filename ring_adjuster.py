@@ -5,17 +5,13 @@ import cv2.aruco as aruco
 cap = cv.VideoCapture('http://192.168.1.16:8000/video_feed')
 cv.namedWindow("Frame")
 
-# Uncomment these if you want to load camera calibration data
-# calibration_data = np.load('calibration_params.npz')
-# mtx = calibration_data['mtx']
-# dist = calibration_data['dist']
-
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters()
 
 center_x = 251
 center_y = 287
 
+ring_11 = 1
 ring_10 = 12
 ring_9 = 36
 ring_8 = 60
@@ -52,10 +48,10 @@ def correctPerspective(frame):
         combined = tuple(zip(ids, corners))
         point_dict = getCorners(combined)
         points_src = np.array([point_dict[0], point_dict[3], point_dict[1], point_dict[2]])
-        points_dst = np.float32([[0, 0], [0, 580], [500, 0], [500, 580]])
+        points_dst = np.float32([[0, 0], [0, 500], [500, 0], [500, 500]])
 
         matrix, _ = cv.findHomography(points_src, points_dst)
-        image_out = cv.warpPerspective(frame, matrix, (500, 580))
+        image_out = cv.warpPerspective(frame, matrix, (500, 500))
         frame = image_out
         markers_found = True
 
@@ -65,6 +61,7 @@ def correctPerspective(frame):
 
 def drawRings(canvas):
     cv.circle(canvas, (center_x, center_y), (1), (0, 0, 255), 2)
+    cv.circle(canvas, (center_x, center_y), (ring_11), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (ring_10), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (ring_9), (255, 0, 255), 2)
     cv.circle(canvas, (center_x, center_y), (ring_8), (255, 0, 255), 2)
@@ -83,6 +80,7 @@ def nothing(_):
 # Trackbars for adjusting the center and rings dynamically
 cv.createTrackbar('Center X', 'Frame', 251, 400, nothing)
 cv.createTrackbar('Center Y', 'Frame', 287, 400, nothing)
+cv.createTrackbar('Ring 11', 'Frame', 1, 400, nothing)  # New trackbar for ring 11
 cv.createTrackbar('Ring 10', 'Frame', 12, 400, nothing)
 cv.createTrackbar('Ring 9', 'Frame', 36, 300, nothing)
 cv.createTrackbar('Ring 8', 'Frame', 60, 300, nothing)
@@ -110,6 +108,7 @@ while True:
         # Get the trackbar positions to dynamically adjust the rings
         center_x = cv.getTrackbarPos('Center X', 'Frame')
         center_y = cv.getTrackbarPos('Center Y', 'Frame')
+        ring_11 = cv.getTrackbarPos('Ring 11', 'Frame')
         ring_10 = cv.getTrackbarPos('Ring 10', 'Frame')
         ring_9 = cv.getTrackbarPos('Ring 9', 'Frame')
         ring_8 = cv.getTrackbarPos('Ring 8', 'Frame')
