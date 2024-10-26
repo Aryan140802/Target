@@ -37,18 +37,21 @@ if selected_ip is None:
 cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
 
 
+x_offset = 10
+y_offset = 10
+
 def getCorners(corners):
     point_dict = {}
     for marker in corners:
         id = marker[0][0]
         if id == 0:
-            point_dict[id] = marker[1][0][0]
+            point_dict[id] = (marker[1][0][0][0] - x_offset, marker[1][0][0][1] - y_offset)
         elif id == 1:
-            point_dict[id] = marker[1][0][1]
+            point_dict[id] = (marker[1][0][1][0] + x_offset,marker[1][0][1][1] - y_offset)
         elif id == 2:
-            point_dict[id] = marker[1][0][2]
+            point_dict[id] = (marker[1][0][2][0] + x_offset,marker[1][0][2][1] + y_offset)
         elif id == 3:
-            point_dict[id] = marker[1][0][3]
+            point_dict[id] = (marker[1][0][3][0] - x_offset,marker[1][0][3][1] + y_offset)
 
 
     return point_dict
