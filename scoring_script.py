@@ -23,6 +23,17 @@ angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 score_sum = 0
 URL = 'http://127.0.0.1:5000/api/score'
 
+#ring params
+k_size = 3
+params = {'alpha': 1.5, 'beta': -0.5, 'gamma': 0}
+cny_lower = 50
+cny_upper = 100
+center_x = 0
+center_y = 0
+largest_radius = 0
+ring_delta = 22
+rings_radius = []
+
 # Initialize the video feed
 
 def selected_ip():
@@ -103,7 +114,9 @@ def getBullets(th1, output_frame, draw=True):
     return bullets
 
 
-def calculateDistance(x1, y1, x2=255, y2=244):
+def calculateDistance(x1, y1):
+    x2 = center_x
+    y2 = center_y
     radius = math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
     print(f"calculateDistance: Distance calculated between ({x1}, {y1}) and ({x2}, {y2}) is {radius}")
     return radius
@@ -116,43 +129,43 @@ def updateScore(bullets):
     for x, y in bullets:
         dist = calculateDistance(x, y)
         angle = calculateAngle(x, y)
-        if 10 <= dist <= 23:
+        if 0 <= dist <= rings_radius[9]:
             score[10].append((x, y))
             score_sum += 10
             angles[10].append(angle)
-        elif 23 < dist <= 53:
+        elif rings_radius[9] < dist <= rings_radius[8]:
             score[9].append((x, y))
             score_sum += 9
             angles[9].append(angle)
-        elif 53 < dist <= 79:
+        elif rings_radius[8] < dist <= rings_radius[7]:
             score[8].append((x, y))
             score_sum += 8
             angles[8].append(angle)
-        elif 79 < dist <= 105:
+        elif rings_radius[7] < dist <= rings_radius[6]:
             score[7].append((x, y))
             score_sum += 7
             angles[7].append(angle)
-        elif 105 < dist <= 135:
+        elif rings_radius[6] < dist <= rings_radius[5]:
             score[6].append((x, y))
             score_sum += 6
             angles[6].append(angle)
-        elif 135 < dist <= 162:
+        elif rings_radius[5] < dist <= rings_radius[4]:
             score[5].append((x, y))
             score_sum += 5
             angles[5].append(angle)
-        elif 162 < dist <= 188:
+        elif rings_radius[4] < dist <= rings_radius[3]:
             score[4].append((x, y))
             score_sum += 4
             angles[4].append(angle)
-        elif 188 < dist <= 215:
+        elif rings_radius[3] < dist <= rings_radius[2]:
             score[3].append((x, y))
             score_sum += 3
             angles[3].append(angle)
-        elif 215 < dist <= 242:
+        elif rings_radius[2] < dist <= rings_radius[1]:
             score[2].append((x, y))
             score_sum += 2
             angles[2].append(angle)
-        elif 242 < dist <= 268:
+        elif rings_radius[1] < dist <= rings_radius[0]:
             score[1].append((x, y))
             score_sum += 1
             angles[1].append(angle)
@@ -185,14 +198,54 @@ def sendData(image, angles):
 
 
 def calculateAngle(x, y):
-    delta_x = (x - 255)
-    delta_y = (y - 244)
+    delta_x = (x - center_x)
+    delta_y = (y - center_y)
     if delta_x == 0:
         angle = -90
     else:
         angle = round(math.atan2(delta_y, delta_x) * 180 / math.pi)
     print(f"calculateAngle: Angle calculated: {angle} for point ({x}, {y})")
     return angle
+
+
+def sharpImageGen(frame):
+    frame1 = frame.copy()
+    gray = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
+    gray_blurred = cv.GaussianBlur(gray, (k_size, k_size), 2)
+    sharpened_image = cv.addWeighted(gray, params['alpha'], gray_blurred, params['beta'], params['gamma'])
+    return sharpened_image
+
+
+
+def contourDetection(frame):
+    global center_x,center_y,largest_radius
+    image = frame.copy()
+    gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    blurred = cv.GaussianBlur(gray, (k_size, k_size), 2)
+    edges = cv.Canny(blurred, cny_lower, cny_upper)
+    contours, hierarchy = cv.findContours(edges, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        perimeter = cv.arcLength(contour, True)
+        approx = cv.approxPolyDP(contour, 0.02 * perimeter, True)
+
+        if len(approx) >= 5:  
+            (x, y), radius = cv.minEnclosingCircle(contour)
+            center_x = x
+            center_y = y
+            largest_radius = radius
+            # cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 0), 2)
+            # cv2.circle(image, (int(x), int(y)), 2, (0, 0, 255), 3)
+    
+    return image
+
+
+def getRings(frame):
+    global center_x, center_y,largest_radius,ring_delta,rings_radius
+    for i in range(10):
+        # cv.circle(frame, (int(center_x), int(center_y)), int(largest_radius - ring_delta * i), (255, 255, 0), 2)
+        rings_radius.append(int(largest_radius - ring_delta * i))
+    
+    return frame
 
 
 def get_current_score():
@@ -216,6 +269,14 @@ if angles is None:
     angles = {10: [], 9: [], 8: [], 7: [], 6: [], 5: [], 4: [], 3: [], 2: [], 1: []}
 for val in angles.keys():
     score_sum += int(val) * len(angles[val])
+
+ret, frame = cap.read()
+corrected_image, target_detected = correctPerspective(frame)
+
+if target_detected:
+    shp_img = cv.cvtColor(sharpImageGen(corrected_image),cv.COLOR_GRAY2BGR)
+    shp_cir_ctd = contourDetection(shp_img)
+    shp_cir_ctd = getRings(shp_cir_ctd)
 
 while True:
     ret, frame = cap.read()
