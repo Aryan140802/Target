@@ -317,3 +317,4 @@ while True:
 sendData(frame, angles)
 cap.release()
 cv.destroyAllWindows()
+
