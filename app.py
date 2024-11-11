@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, Response
 import time
 import base64
 import json
@@ -7,10 +7,12 @@ import requests
 import threading
 import webview  # PyWebview for desktop window
 import logging
-
+from starter_script import VideoFeed  # Ensure this import is correct
+import cv2 as cv
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'your_secret_key'  # Necessary for session management
+
 
 # Global variables to store the latest image and score
 device_ips = {
@@ -24,7 +26,7 @@ device_ips = {
     '7': "192.168.1.7",
     '8': "192.168.1.8",
     '9': "192.168.1.9",
-    '10': "192.168.1.10"
+    '16': "192.168.1.16"
     # Add more as needed
 }
 
@@ -43,50 +45,33 @@ logging.basicConfig(level=logging.DEBUG,
 
 logger = logging.getLogger(__name__)
 
-
 def calculateTotal(angles):
     total = 0
     for points in angles.keys():
         total += int(points) * len(angles[points])
     return total
 
+def generate_video_feed():
+    """Stream video feed from the VideoFeed class."""
+    video_feed = VideoFeed()  # Initialize your VideoFeed instance
+    while True:
+        frame = video_feed.get_frame()  # Replace this with the method to get a frame
+        if frame is None:
+            continue
+        # Encode the frame to JPEG format
+        _, buffer = cv.imencode('.jpg', frame)  # Assuming you are using OpenCV
+        frame = buffer.tobytes()
+        # Yield the frame in the multipart format
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
-# Route for handling login
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    try:
-        if request.method == 'POST':
-            device_id = request.form['device_id']
+@app.route('/videofeed')
+def videofeed():
+    """Video feed route."""
+    return Response(generate_video_feed(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
-            # Check if the device ID exists in the list
-            if device_id in device_ips:
-                global selected_ip
-                selected_ip = device_ips[device_id]
-                session['logged_in'] = True  # Store login state in the session
-                flash('Device selected successfully!', 'success')
-                return redirect(url_for('index'))  # Redirect to the index page upon successful login
-            else:
-                flash('Invalid device ID. Please try again.', 'error')
-                logger.warning(f"Login attempt failed for device ID: {device_id}")
-
-        return render_template('login.html')  # Render the login form
-    except Exception as e:
-        logger.error(f"Error during login: {e}")
-        return "An error occurred during login.", 500
-
-
-# Route for handling logout
-@app.route('/logout')
-def logout():
-    try:
-        session.pop('logged_in', None)  # Log out the user
-        flash('Logged out successfully.', 'success')
-        return redirect(url_for('login'))
-    except Exception as e:
-        logger.error(f"Error during logout: {e}")
-        return "An error occurred during logout.", 500
-
-
+# Other routes...
 # Main index route
 @app.route('/')
 def index():
@@ -115,6 +100,7 @@ def receive_score():
         if latest_angles_dict is not None:
             latest_score = calculateTotal(latest_angles_dict)
 
+
         return 'Data received successfully', 200
     except Exception as e:
         logger.error(f"Error in /api/score: {e}")
@@ -135,19 +121,19 @@ def get_selected_ip():
         return "An error occurred while retrieving the selected IP address.", 500
 
 
-
-
-
-
+# Additional API routes with logging
 @app.route('/api/starter', methods=['POST'])
 def receive_starter():
-    global latest_image
+    try:
+        global latest_image
 
-    image_file = request.files['image']
+        image_file = request.files['image']
+        latest_image = image_file.read()
 
-    latest_image = image_file.read()
-
-    return 'Data received successfully', 200
+        return 'Data received successfully', 200
+    except Exception as e:
+        logger.error(f"Error in /api/starter: {e}")
+        return "An error occurred while receiving starter data.", 500
 
 
 @app.route('/api/data')
