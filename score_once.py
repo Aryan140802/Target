@@ -44,7 +44,7 @@ def selected_ip():
         print(f"Error: {e}")
         return None
 
-selected_ip =  selected_ip()  # Fetch selected IP from the Flask app
+selected_ip =  "192.168.1.16"  # Fetch selected IP from the Flask app
 
 if selected_ip is None:
     raise ValueError("No selected IP provided. Please ensure you have selected the device in the app.")

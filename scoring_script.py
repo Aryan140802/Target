@@ -32,7 +32,7 @@ center_x = 0
 center_y = 0
 largest_radius = 0
 ring_delta = 22
-rings_radius = []
+rings_radius=[]
 
 # Initialize the video feed
 
@@ -48,7 +48,7 @@ def selected_ip():
         print(f"Error: {e}")
         return None
 
-selected_ip =  selected_ip()  # Fetch selected IP from the Flask app
+selected_ip = "192.168.1.16"  # Fetch selected IP from the Flask app
 
 if selected_ip is None:
     raise ValueError("No selected IP provided. Please ensure you have selected the device in the app.")
@@ -57,8 +57,8 @@ if selected_ip is None:
 cap = cv.VideoCapture(f"http://{selected_ip}:8000/video_feed")  # Use dynamic IP address
 
 
-x_offset = 10
-y_offset = 10
+x_offset = 30
+y_offset = 30
 
 def getCorners(corners):
     point_dict = {}
@@ -108,7 +108,7 @@ def getBullets(th1, output_frame, draw=True):
         ((x, y), radius) = cv.minEnclosingCircle(contour)
         bullets.append((int(x), int(y)))
         if draw:
-            cv.circle(output_frame, (int(x), int(y)), (int(radius)), (0, 0, 255), -1)
+            cv.circle(output_frame, (int(x), int(y)), (int(radius)), (0, 0, 255), 1)
 
     print(f"getBullets: Bullets detected: {bullets}")
     return bullets
@@ -132,43 +132,53 @@ def updateScore(bullets):
         if 0 <= dist <= rings_radius[9]:
             score[10].append((x, y))
             score_sum += 10
-            angles[10].append(angle)
+            if angles.get(10) is not None:
+                angles[10].append(angle)
         elif rings_radius[9] < dist <= rings_radius[8]:
             score[9].append((x, y))
             score_sum += 9
-            angles[9].append(angle)
+            if angles.get(9) is not None:
+                angles[9].append(angle)
         elif rings_radius[8] < dist <= rings_radius[7]:
             score[8].append((x, y))
             score_sum += 8
-            angles[8].append(angle)
+            if angles.get(8) is not None:
+                angles[8].append(angle)
         elif rings_radius[7] < dist <= rings_radius[6]:
             score[7].append((x, y))
             score_sum += 7
-            angles[7].append(angle)
+            if angles.get(7) is not None:
+                angles[7].append(angle)
         elif rings_radius[6] < dist <= rings_radius[5]:
             score[6].append((x, y))
             score_sum += 6
-            angles[6].append(angle)
+            if angles.get(6) is not None:
+                angles[6].append(angle)
         elif rings_radius[5] < dist <= rings_radius[4]:
             score[5].append((x, y))
             score_sum += 5
-            angles[5].append(angle)
+            if angles.get(5) is not None:
+                angles[5].append(angle)
         elif rings_radius[4] < dist <= rings_radius[3]:
             score[4].append((x, y))
             score_sum += 4
-            angles[4].append(angle)
+            if angles.get(4) is not None:
+                angles[4].append(angle)
         elif rings_radius[3] < dist <= rings_radius[2]:
             score[3].append((x, y))
             score_sum += 3
-            angles[3].append(angle)
+            if angles.get(3) is not None:
+                angles[3].append(angle)
         elif rings_radius[2] < dist <= rings_radius[1]:
             score[2].append((x, y))
             score_sum += 2
-            angles[2].append(angle)
+            if angles.get(2) is not None:
+                angles[2].append(angle)
         elif rings_radius[1] < dist <= rings_radius[0]:
             score[1].append((x, y))
             score_sum += 1
-            angles[1].append(angle)
+            if angles.get(1) is not None:
+                angles[1].append(angle)
 
     print(f"updateScore: Updated score: {score}, score_sum: {score_sum}")
 
@@ -224,28 +234,53 @@ def contourDetection(frame):
     blurred = cv.GaussianBlur(gray, (k_size, k_size), 2)
     edges = cv.Canny(blurred, cny_lower, cny_upper)
     contours, hierarchy = cv.findContours(edges, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    max_area = 0
     for contour in contours:
         perimeter = cv.arcLength(contour, True)
         approx = cv.approxPolyDP(contour, 0.02 * perimeter, True)
 
-        if len(approx) >= 5:  
-            (x, y), radius = cv.minEnclosingCircle(contour)
-            center_x = x
-            center_y = y
-            largest_radius = radius
+        if len(approx) >= 5:
+            area = cv.contourArea(contour)
+            print(area)
+            if area > max_area:
+                max_area = area
+                
+                (x, y), radius = cv.minEnclosingCircle(contour)
+                center_x = x
+                center_y = y+7
+                y += 7
+                largest_radius = radius
+                cv.circle(image, (int(x), int(y)), int(radius), (0, 0, 255), 3)
+                cv.circle(image, (int(x), int(y)), 1, (0, 255, 255), 3)
+                
             # cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 0), 2)
             # cv2.circle(image, (int(x), int(y)), 2, (0, 0, 255), 3)
+            cv.drawContours(image, [contour], -1, (0, 255, 0), 2)
+            cv.imshow("countour", image)
+            
+            cv.waitKey(100);
+                    
+    getRings()
+    drawRings(frame.copy())
     
     return image
 
 
-def getRings(frame):
+def getRings():
     global center_x, center_y,largest_radius,ring_delta,rings_radius
     for i in range(10):
-        # cv.circle(frame, (int(center_x), int(center_y)), int(largest_radius - ring_delta * i), (255, 255, 0), 2)
         rings_radius.append(int(largest_radius - ring_delta * i))
-    
-    return frame
+
+
+def drawRings(canvas):
+    center_cir = (int(center_x), int(center_y))
+    cv.circle(canvas, center_cir, 1, (0, 0, 255), 2)
+    for i in range(10):
+        cv.circle(canvas, center_cir , (rings_radius[i]), (255, 0, 255), 2)
+        cv.imshow("rings", canvas)
+            
+        cv.waitKey(100);
+    #cv.waitKey(0);        
 
 
 def get_current_score():
@@ -276,44 +311,49 @@ corrected_image, target_detected = correctPerspective(frame)
 if target_detected:
     shp_img = cv.cvtColor(sharpImageGen(corrected_image),cv.COLOR_GRAY2BGR)
     shp_cir_ctd = contourDetection(shp_img)
-    shp_cir_ctd = getRings(shp_cir_ctd)
+    getRings()
+    
 
-while True:
-    ret, frame = cap.read()
-    # frame = cv.undistort(frame, mtx, dist, None)
-    if not ret:
-        print("Error with Webcam")
-        break
+print(center_x, center_y)
+if __name__ == "__main__":
+    while True:
+        ret, frame = cap.read()
+        # frame = cv.undistort(frame, mtx, dist, None)
+        if not ret:
+            print("Error with Webcam")
+            break
 
-    curr_time = time.time()
-    if ((curr_time - start_time)) > fps_limit:
-        corrected_image, target_detected = correctPerspective(frame)
-        frame = corrected_image.copy()
+        curr_time = time.time()
+        if ((curr_time - start_time)) > fps_limit:
+            corrected_image, target_detected = correctPerspective(frame)
+            frame = corrected_image.copy()
 
-        frame = cv.GaussianBlur(frame, (5, 5), 0)
-        output_frame = frame.copy()
+            frame = cv.GaussianBlur(frame, (5, 5), 0)
+            output_frame = frame.copy()
 
-        if target_detected:
-            if prev_frame is not None:
-                diff = cv.absdiff(prev_frame, frame)
-                gray = cv.cvtColor(diff, cv.COLOR_BGR2GRAY)
-                blur = cv.GaussianBlur(gray, (5, 5), 0)
-                _, th1 = cv.threshold(blur, 50, 255, cv.THRESH_BINARY)
+            if target_detected:
+                if prev_frame is not None:
+                    diff = cv.absdiff(prev_frame, frame)
+                    gray = cv.cvtColor(diff, cv.COLOR_BGR2GRAY)
+                    blur = cv.GaussianBlur(gray, (5, 5), 0)
+                    _, th1 = cv.threshold(blur, 60, 255, cv.THRESH_BINARY)
+                    cv.imshow("Thresh", th1)
 
-                bullets = getBullets(th1, output_frame)
-                updateScore(bullets)
+                    bullets = getBullets(th1, output_frame)
+                    updateScore(bullets)
+                    sendData(corrected_image, angles)
 
-            prev_frame = frame
-            frame = drawFrame(output_frame)
+                prev_frame = frame
+                frame = drawFrame(output_frame)
 
-        start_time = time.time()
+            start_time = time.time()
 
-    # cv.imshow("Frame", frame)
+            cv.imshow("Frame", frame)
 
-    if cv.waitKey(1) & 0xFF == ord('q'):
-        print("Exit signal received, closing the application.")
-        break
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            print("Exit signal received, closing the application.")
+            break
 
-sendData(frame, angles)
-cap.release()
-cv.destroyAllWindows()
+    sendData(frame, angles)
+    cap.release()
+    cv.destroyAllWindows()
