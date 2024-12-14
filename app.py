@@ -7,7 +7,7 @@ import requests
 import threading
 import webview  # PyWebview for desktop window
 import logging
-from starter_script import VideoFeed  # Ensure this import is correct
+
 import cv2 as cv
 
 app = Flask(__name__, static_folder='static')
